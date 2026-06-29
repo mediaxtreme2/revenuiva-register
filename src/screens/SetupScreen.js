@@ -58,7 +58,8 @@ export default function SetupScreen({ navigation }) {
       await SecureStore.setItemAsync('device_name', deviceName.trim());
       navigation.replace('Terminal');
     } catch (e) {
-      setError(e.response?.data?.error || 'Registration failed. Try again.');
+      const msg = e.response?.data?.message || e.response?.data?.error || JSON.stringify(e.response?.data?.errors || {});
+      setError(msg || 'Registration failed. Try again.');
     } finally {
       setLoading(false);
     }
