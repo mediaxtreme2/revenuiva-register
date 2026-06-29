@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
   ActivityIndicator, ScrollView, Alert, AppState, Animated, Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Haptics from 'expo-haptics';
@@ -84,10 +85,30 @@ export default function TerminalScreen({ navigation }) {
     appState.current = nextState;
   };
 
+  const requestPermissions = async () => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const results = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      ]);
+      console.log('[Permissions]', JSON.stringify(results));
+      return Object.values(results).every(
+        r => r === PermissionsAndroid.RESULTS.GRANTED
+      );
+    } catch (e) {
+      console.warn('[Permissions] Request failed:', e.message);
+      return false;
+    }
+  };
+
   const init = async () => {
     const name = await SecureStore.getItemAsync('device_name');
     setDeviceName(name || 'Device');
     try {
+      const permsOk = await requestPermissions();
+      console.log('[Terminal] Permissions granted:', permsOk);
       await initTerminal();
       await connectTerminalReader();
     } catch (e) {
