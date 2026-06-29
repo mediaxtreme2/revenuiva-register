@@ -142,23 +142,39 @@ export default function TerminalScreen({ navigation }) {
 
   const connectTerminalReader = async () => {
     try {
-      const { readers } = await discoverReaders({
+      console.log('[Terminal] Discovering localMobile readers...');
+      const { readers, error: discoverError } = await discoverReaders({
         discoveryMethod: 'localMobile',
         simulated: false,
       });
+      if (discoverError) {
+        console.warn('[Terminal] Discovery error:', discoverError.message);
+        setErrorMsg('Reader discovery failed: ' + discoverError.message);
+        return false;
+      }
+      console.log('[Terminal] Found readers:', readers?.length || 0);
       if (readers && readers.length > 0) {
-        const { reader } = await connectLocalMobileReader({
+        console.log('[Terminal] Connecting to reader:', readers[0].serialNumber);
+        const { reader, error: connectError } = await connectLocalMobileReader({
           reader: readers[0],
           locationId: 'tml_Gj59ACoEe3BBd0',
         });
+        if (connectError) {
+          console.warn('[Terminal] Connect error:', connectError.message);
+          setErrorMsg('Reader connect failed: ' + connectError.message);
+          return false;
+        }
         if (reader) {
+          console.log('[Terminal] Connected successfully');
           setTerminalReady(true);
           return true;
         }
       }
+      setErrorMsg('No NFC reader found. Ensure Google Play Services is active and device has a lock screen enabled.');
       return false;
     } catch (e) {
-      console.warn('Terminal reader connect failed:', e.message);
+      console.warn('[Terminal] Reader connect exception:', e.message);
+      setErrorMsg('Terminal error: ' + e.message);
       return false;
     }
   };
@@ -168,30 +184,38 @@ export default function TerminalScreen({ navigation }) {
       if (!terminalReady) {
         const ok = await connectTerminalReader();
         if (!ok) {
-          startPaymentStatusPolling();
+          setPhase('error');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           return;
         }
       }
-      const { paymentIntent, error } = await collectPaymentMethod({ paymentIntent: data.payment_intent_id });
+      console.log('[Terminal] Collecting payment, client_secret:', data.client_secret?.substring(0, 20) + '...');
+      const { paymentIntent, error } = await collectPaymentMethod({ paymentIntent: data.client_secret });
       if (error) {
+        console.warn('[Terminal] Collect error:', error.message, error.code);
         setErrorMsg(error.message || 'Card collection failed.');
         setPhase('error');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
+      console.log('[Terminal] Card collected, confirming...');
       const { paymentIntent: confirmed, error: confirmError } = await confirmPaymentIntent({ paymentIntent: paymentIntent.id });
       if (confirmError) {
+        console.warn('[Terminal] Confirm error:', confirmError.message);
         setErrorMsg(confirmError.message || 'Payment confirmation failed.');
         setPhase('error');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;
       }
+      console.log('[Terminal] Payment confirmed!');
       await confirmPayment(activeOrder.id, confirmed.id, 'tap_to_pay');
       setPhase('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.warn('Terminal collection error:', e.message);
-      startPaymentStatusPolling();
+      console.warn('[Terminal] Collection exception:', e.message);
+      setErrorMsg('Payment failed: ' + e.message);
+      setPhase('error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
