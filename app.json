@@ -47,7 +47,7 @@
             "ndkVersion": "27.0.12077973",
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "minSdkVersion": 24
+            "minSdkVersion": 26
           }
         }
       ]
