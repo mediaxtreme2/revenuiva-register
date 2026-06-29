@@ -48,7 +48,12 @@ export default function SetupScreen({ navigation }) {
     setError('');
     try {
       const token = generateToken();
-      await registerDevice(deviceName.trim(), token);
+      const hardwareInfo = {
+        device_model: Device.modelName || Device.deviceName || 'Unknown',
+        device_os: `${Device.osName || 'Unknown'} ${Device.osVersion || ''}`.trim(),
+        device_hardware_id: Device.osBuildId || Device.osInternalBuildId || null,
+      };
+      await registerDevice(deviceName.trim(), token, null, hardwareInfo);
       await SecureStore.setItemAsync('device_token', token);
       await SecureStore.setItemAsync('device_name', deviceName.trim());
       navigation.replace('Terminal');

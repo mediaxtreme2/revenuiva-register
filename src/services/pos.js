@@ -1,10 +1,11 @@
 import api from '../config/api';
 
-export async function registerDevice(deviceName, deviceToken, locationId = null) {
+export async function registerDevice(deviceName, deviceToken, locationId = null, hardwareInfo = {}) {
   const { data } = await api.post('/register-device', {
     device_name: deviceName,
     device_token: deviceToken,
     location_id: locationId,
+    ...hardwareInfo,
   });
   return data;
 }
