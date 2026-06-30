@@ -30,11 +30,21 @@ export default function TerminalScreen({ navigation }) {
   const statusPollRef = useRef(null);
   const appState = useRef(AppState.currentState);
   const isProcessing = useRef(false);
+  const phaseRef = useRef('idle');
+  const errorLockedUntil = useRef(0);
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
   const pulseScale = useRef(new Animated.Value(1)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(0.5)).current;
   const nfcGlow = useRef(new Animated.Value(0)).current;
+
+  const updatePhase = useCallback((newPhase) => {
+    if (newPhase === 'error') {
+      errorLockedUntil.current = Date.now() + 30000;
+    }
+    phaseRef.current = newPhase;
+    setPhase(newPhase);
+  }, []);
 
   const {
     easyConnect,
@@ -118,7 +128,7 @@ export default function TerminalScreen({ navigation }) {
 
   const handleAppState = (nextState) => {
     if (appState.current.match(/inactive|background/) && nextState === 'active') {
-      if (!isProcessing.current) pollNow();
+      if (!isProcessing.current && phaseRef.current === 'idle') pollNow();
     }
     appState.current = nextState;
   };
@@ -174,6 +184,8 @@ export default function TerminalScreen({ navigation }) {
 
   const pollNow = async () => {
     if (isProcessing.current) return;
+    if (phaseRef.current === 'error' || phaseRef.current === 'tapping' || phaseRef.current === 'success') return;
+    if (Date.now() < errorLockedUntil.current) return;
     try {
       const token = await SecureStore.getItemAsync('device_token');
       if (!token) return;
@@ -181,7 +193,7 @@ export default function TerminalScreen({ navigation }) {
       setConnected(true);
       const incoming = data.orders || [];
       setOrders(incoming);
-      if (incoming.length > 0 && phase === 'idle' && !activeOrder && !isProcessing.current) {
+      if (incoming.length > 0 && phaseRef.current === 'idle' && !isProcessing.current) {
         handleIncomingOrder(incoming[0]);
       }
     } catch (e) {
@@ -191,8 +203,10 @@ export default function TerminalScreen({ navigation }) {
 
   const handleIncomingOrder = (order) => {
     if (isProcessing.current) return;
+    if (phaseRef.current === 'error' || phaseRef.current === 'tapping' || phaseRef.current === 'success') return;
+    if (Date.now() < errorLockedUntil.current) return;
     setActiveOrder(order);
-    setPhase('collecting');
+    updatePhase('collecting');
     setErrorMsg('');
     setStatusMsg('');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -200,7 +214,8 @@ export default function TerminalScreen({ navigation }) {
 
   const resetToIdle = () => {
     isProcessing.current = false;
-    setPhase('idle');
+    errorLockedUntil.current = 0;
+    updatePhase('idle');
     setActiveOrder(null);
     setPaymentData(null);
     setErrorMsg('');
@@ -238,7 +253,7 @@ export default function TerminalScreen({ navigation }) {
 
     isProcessing.current = true;
     stopPolling();
-    setPhase('tapping');
+    updatePhase('tapping');
     setErrorMsg('');
     setStatusMsg('Preparing payment...');
 
@@ -257,7 +272,7 @@ export default function TerminalScreen({ navigation }) {
     isProcessing.current = false;
     setErrorMsg(msg);
     setStatusMsg('');
-    setPhase('error');
+    updatePhase('error');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
   };
 
@@ -302,7 +317,7 @@ export default function TerminalScreen({ navigation }) {
 
       isProcessing.current = false;
       setStatusMsg('');
-      setPhase('success');
+      updatePhase('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       showError('Payment failed: ' + e.message);
@@ -310,9 +325,10 @@ export default function TerminalScreen({ navigation }) {
   };
 
   const handleRetry = () => {
+    errorLockedUntil.current = 0;
     setErrorMsg('');
     setStatusMsg('');
-    setPhase('collecting');
+    updatePhase('collecting');
     isProcessing.current = false;
   };
 
@@ -333,7 +349,7 @@ export default function TerminalScreen({ navigation }) {
               await markCash(activeOrder.id);
               isProcessing.current = false;
               setStatusMsg('');
-              setPhase('success');
+              updatePhase('success');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (e) {
               showError('Failed to process cash payment. Please try again.');
