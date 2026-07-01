@@ -41,16 +41,19 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv android/app/build/outputs/apk/release/app-release.apk RevenuivaAI-Register-v1.1.2.apk
+          mv android/app/build/outputs/apk/release/app-release.apk RevenuivaAI-Register-v1.2.0.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.2-android
-          name: RevenuivaAI Register v1.1.2 (Android)
+          tag_name: v1.2.0-android
+          name: RevenuivaAI Register v1.2.0 (Android)
           body: |
-            RevenuivaAI Register v1.1.2
+            RevenuivaAI Register v1.2.0
 
-            - Show/hide password toggle on login screen
-          files: RevenuivaAI-Register-v1.1.2.apk
+            - RevenuivaAI logo on login screen (replaces blue circle)
+            - Show/hide password toggle
+            - NFC error screen stays visible until dismissed
+            - Smooth NFC tap-to-pay flow
+          files: RevenuivaAI-Register-v1.2.0.apk
           make_latest: true
