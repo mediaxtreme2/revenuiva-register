@@ -40,6 +40,7 @@ jobs:
         env:
           GRADLE_OPTS: -Xmx6g -XX:+UseParallelGC
         run: |
+          printf '\n' >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError" >> gradle.properties
           echo "org.gradle.daemon=false" >> gradle.properties
           echo "org.gradle.workers.max=2" >> gradle.properties
