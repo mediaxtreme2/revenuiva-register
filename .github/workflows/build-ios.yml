@@ -67,7 +67,7 @@ jobs:
                 api_key: api_key,
                 team_id: "DBJC3A73UV",
                 platform: "ios",
-                keychain_name: keychain_name,
+                keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db"),
                 keychain_password: keychain_password
               )
 
