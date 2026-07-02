@@ -9,8 +9,6 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,22 +38,24 @@ jobs:
       - name: Install Fastlane
         run: gem install fastlane
 
-      - name: Create Keychain
-        run: |
-          security create-keychain -p "actions" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "actions" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security list-keychains -d user -s build.keychain $(security list-keychains -d user | sed s/\"//g)
-
-      - name: Setup Fastlane & Build
+      - name: Build and Upload via Fastlane
         run: |
           mkdir -p fastlane
           cat > fastlane/Fastfile << 'RUBY'
           default_platform(:ios)
           platform :ios do
             lane :build_and_upload do
-              setup_ci
+              keychain_name = "build_keychain"
+              keychain_password = "actions"
+
+              create_keychain(
+                name: keychain_name,
+                password: keychain_password,
+                default_keychain: true,
+                unlock: true,
+                timeout: 3600,
+                lock_when_sleeps: false
+              )
 
               api_key = app_store_connect_api_key(
                 key_id: "UPZZZQT35C",
@@ -66,7 +66,9 @@ jobs:
               get_certificates(
                 api_key: api_key,
                 team_id: "DBJC3A73UV",
-                platform: "ios"
+                platform: "ios",
+                keychain_name: keychain_name,
+                keychain_password: keychain_password
               )
 
               get_provisioning_profile(
@@ -75,12 +77,16 @@ jobs:
                 team_id: "DBJC3A73UV"
               )
 
+              profile_path = ENV["sigh_com.revenuivaai.register_appstore_profile-path"]
+              profile_uuid = lane_context[SharedValues::SIGH_UDID]
+
               update_code_signing_settings(
                 use_automatic_signing: false,
                 path: "ios/RevenuivaAI.xcodeproj",
                 team_id: "DBJC3A73UV",
                 bundle_identifier: "com.revenuivaai.register",
-                profile_name: ENV["sigh_com.revenuivaai.register_appstore_profile-name"]
+                code_sign_identity: "iPhone Distribution",
+                profile_uuid: profile_uuid
               )
 
               build_app(
@@ -89,9 +95,13 @@ jobs:
                 export_method: "app-store",
                 output_directory: "./build",
                 output_name: "RevenuivaAI.ipa",
+                xcargs: "DEVELOPMENT_TEAM=DBJC3A73UV",
                 export_options: {
                   signingStyle: "manual",
-                  teamID: "DBJC3A73UV"
+                  teamID: "DBJC3A73UV",
+                  provisioningProfiles: {
+                    "com.revenuivaai.register" => ENV["sigh_com.revenuivaai.register_appstore_profile-name"]
+                  }
                 }
               )
 
@@ -106,6 +116,6 @@ jobs:
 
           fastlane ios build_and_upload
 
-      - name: Cleanup Keychain
+      - name: Cleanup
         if: always()
-        run: security delete-keychain build.keychain 2>/dev/null || true
+        run: security delete-keychain build_keychain 2>/dev/null || true
