@@ -232,9 +232,28 @@ jobs:
                   }
                 }
               )
+            end
+          end
+          RUBY
 
+          fastlane ios build_and_upload
+
+      - name: Upload to TestFlight
+        continue-on-error: true
+        run: |
+          mkdir -p fastlane
+          cat > fastlane/Fastfile << 'RUBY'
+          default_platform(:ios)
+          platform :ios do
+            lane :upload do
+              api_key = app_store_connect_api_key(
+                key_id: "UPZZZQT35C",
+                issuer_id: "a617b860-c739-45d9-b2c2-bb7a2a6f02a3",
+                key_filepath: File.expand_path("~/private_keys/AuthKey_UPZZZQT35C.p8")
+              )
               upload_to_testflight(
                 api_key: api_key,
+                ipa: "./build/RevenuivaAI.ipa",
                 skip_waiting_for_build_processing: true,
                 skip_submission: true
               )
@@ -242,7 +261,22 @@ jobs:
           end
           RUBY
 
-          fastlane ios build_and_upload
+          fastlane ios upload
+
+      - name: Create GitHub Release with IPA
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.3-ios
+          name: RevenuivaAI v2.0.3 (iOS)
+          body: |
+            RevenuivaAI v2.0.3 - iOS (Stripe Tap to Pay)
+
+            - Stripe Terminal NFC Tap to Pay
+            - RevenuivaAI site-icon logo
+            - Same features as Android edition
+          files: build/RevenuivaAI.ipa
+          make_latest: false
 
       - name: Cleanup
         if: always()
