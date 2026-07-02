@@ -123,6 +123,15 @@ jobs:
                 keychain_password: keychain_password
               )
 
+              # Create App ID on Apple Developer Portal if it doesn't exist
+              produce(
+                api_key: api_key,
+                app_identifier: "com.revenuivaai.register",
+                app_name: "RevenuivaAI",
+                team_id: "DBJC3A73UV",
+                skip_itc: true
+              )
+
               get_provisioning_profile(
                 api_key: api_key,
                 app_identifier: "com.revenuivaai.register",
