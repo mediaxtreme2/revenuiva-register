@@ -118,6 +118,53 @@ jobs:
           else
             puts "App ID com.revenuivaai.register already exists"
           end
+
+          # Get the bundle ID resource id for App Store Connect app creation
+          bid_resp2 = http.request(bid_req)
+          bid_data2 = JSON.parse(bid_resp2.body)
+          bundle_id_resource = bid_data2["data"].first
+          bundle_resource_id = bundle_id_resource["id"]
+          puts "Bundle ID resource: #{bundle_resource_id}"
+
+          # Check if app exists on App Store Connect
+          apps_uri = URI("https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=com.revenuivaai.register")
+          apps_req = Net::HTTP::Get.new(apps_uri)
+          apps_req["Authorization"] = "Bearer #{token}"
+          apps_resp = http.request(apps_req)
+          apps_data = JSON.parse(apps_resp.body)
+
+          if apps_data["data"].empty?
+            puts "Creating app on App Store Connect..."
+            app_uri = URI("https://api.appstoreconnect.apple.com/v1/apps")
+            app_req = Net::HTTP::Post.new(app_uri)
+            app_req["Authorization"] = "Bearer #{token}"
+            app_req["Content-Type"] = "application/json"
+            app_req.body = JSON.generate({
+              data: {
+                type: "apps",
+                attributes: {
+                  name: "RevenuivaAI",
+                  primaryLocale: "en-US",
+                  bundleId: "com.revenuivaai.register",
+                  sku: "com.revenuivaai.register"
+                },
+                relationships: {
+                  bundleId: {
+                    data: { type: "bundleIds", id: bundle_resource_id }
+                  }
+                }
+              }
+            })
+            app_resp = http.request(app_req)
+            puts "App creation response: #{app_resp.code}"
+            if app_resp.code.to_i >= 400
+              puts app_resp.body
+            else
+              puts "App created on App Store Connect!"
+            end
+          else
+            puts "App already exists on App Store Connect"
+          end
           '
 
       - name: Build and Upload via Fastlane
