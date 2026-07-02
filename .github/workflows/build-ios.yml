@@ -9,6 +9,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +26,7 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform ios --clean
 
-      - name: Setup API Key for signing
+      - name: Setup API Key
         env:
           ASC_API_KEY: ${{ secrets.ASC_API_KEY_P8 }}
         run: |
@@ -35,55 +37,75 @@ jobs:
         working-directory: ios
         run: pod install
 
-      - name: Build & Archive
-        working-directory: ios
-        run: |
-          xcodebuild archive \
-            -workspace RevenuivaAI.xcworkspace \
-            -scheme RevenuivaAI \
-            -configuration Release \
-            -archivePath $RUNNER_TEMP/RevenuivaAI.xcarchive \
-            -destination 'generic/platform=iOS' \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_UPZZZQT35C.p8 \
-            -authenticationKeyID UPZZZQT35C \
-            -authenticationKeyIssuerID a617b860-c739-45d9-b2c2-bb7a2a6f02a3 \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=DBJC3A73UV \
-            | xcpretty
+      - name: Install Fastlane
+        run: gem install fastlane
 
-      - name: Export IPA
+      - name: Create Keychain
         run: |
-          cat > $RUNNER_TEMP/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>teamID</key>
-            <string>DBJC3A73UV</string>
-            <key>destination</key>
-            <string>upload</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-          </dict>
-          </plist>
-          PLIST
+          security create-keychain -p "actions" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "actions" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | sed s/\"//g)
 
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/RevenuivaAI.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_UPZZZQT35C.p8 \
-            -authenticationKeyID UPZZZQT35C \
-            -authenticationKeyIssuerID a617b860-c739-45d9-b2c2-bb7a2a6f02a3
-
-      - name: Upload to TestFlight
+      - name: Setup Fastlane & Build
         run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$RUNNER_TEMP/export/RevenuivaAI.ipa" \
-            --apiKey UPZZZQT35C \
-            --apiIssuer a617b860-c739-45d9-b2c2-bb7a2a6f02a3
+          mkdir -p fastlane
+          cat > fastlane/Fastfile << 'RUBY'
+          default_platform(:ios)
+          platform :ios do
+            lane :build_and_upload do
+              setup_ci
+
+              api_key = app_store_connect_api_key(
+                key_id: "UPZZZQT35C",
+                issuer_id: "a617b860-c739-45d9-b2c2-bb7a2a6f02a3",
+                key_filepath: File.expand_path("~/private_keys/AuthKey_UPZZZQT35C.p8")
+              )
+
+              get_certificates(
+                api_key: api_key,
+                team_id: "DBJC3A73UV",
+                platform: "ios"
+              )
+
+              get_provisioning_profile(
+                api_key: api_key,
+                app_identifier: "com.revenuivaai.register",
+                team_id: "DBJC3A73UV"
+              )
+
+              update_code_signing_settings(
+                use_automatic_signing: false,
+                path: "ios/RevenuivaAI.xcodeproj",
+                team_id: "DBJC3A73UV",
+                bundle_identifier: "com.revenuivaai.register",
+                profile_name: ENV["sigh_com.revenuivaai.register_appstore_profile-name"]
+              )
+
+              build_app(
+                workspace: "ios/RevenuivaAI.xcworkspace",
+                scheme: "RevenuivaAI",
+                export_method: "app-store",
+                output_directory: "./build",
+                output_name: "RevenuivaAI.ipa",
+                export_options: {
+                  signingStyle: "manual",
+                  teamID: "DBJC3A73UV"
+                }
+              )
+
+              upload_to_testflight(
+                api_key: api_key,
+                skip_waiting_for_build_processing: true,
+                skip_submission: true
+              )
+            end
+          end
+          RUBY
+
+          fastlane ios build_and_upload
+
+      - name: Cleanup Keychain
+        if: always()
+        run: security delete-keychain build.keychain 2>/dev/null || true
