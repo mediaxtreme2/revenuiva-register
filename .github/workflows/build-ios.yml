@@ -63,20 +63,28 @@ jobs:
                 key_filepath: File.expand_path("~/private_keys/AuthKey_UPZZZQT35C.p8")
               )
 
+              # Revoke oldest iOS Distribution cert to make room for a new one
+              UI.message("Checking existing distribution certificates...")
+              require 'spaceship'
+              Spaceship::ConnectAPI.token = api_key
+              certs = Spaceship::ConnectAPI::Certificate.all.select { |c|
+                c.certificate_type == "IOS_DISTRIBUTION" || c.certificate_type == "DISTRIBUTION"
+              }
+              UI.message("Found #{certs.length} distribution certificate(s)")
+              if certs.length >= 2
+                oldest = certs.min_by { |c| c.id }
+                UI.message("Revoking certificate #{oldest.id} to make room...")
+                oldest.delete!
+                UI.success("Revoked certificate #{oldest.id}")
+              end
+
               get_certificates(
                 api_key: api_key,
                 team_id: "DBJC3A73UV",
                 platform: "ios",
-                force: true,
                 keychain_path: File.expand_path("~/Library/Keychains/#{keychain_name}-db"),
                 keychain_password: keychain_password
               )
-
-              # Save cert for future builds
-              cert_path = lane_context[SharedValues::CERT_FILE_PATH]
-              if cert_path && File.exist?(cert_path)
-                UI.message("Certificate saved at: #{cert_path}")
-              end
 
               get_provisioning_profile(
                 api_key: api_key,
@@ -84,7 +92,6 @@ jobs:
                 team_id: "DBJC3A73UV"
               )
 
-              profile_path = ENV["sigh_com.revenuivaai.register_appstore_profile-path"]
               profile_uuid = lane_context[SharedValues::SIGH_UDID]
 
               update_code_signing_settings(
