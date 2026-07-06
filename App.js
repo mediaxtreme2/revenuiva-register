@@ -5,7 +5,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StripeTerminalProvider } from '@stripe/stripe-terminal-react-native';
 import { isAuthenticated } from './src/services/auth';
+import { isActivated } from './src/services/activation';
+import { loadBrand, getBrand } from './src/services/brand';
 import { getConnectionToken } from './src/services/pos';
+import ActivationScreen from './src/screens/ActivationScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SetupScreen from './src/screens/SetupScreen';
 import TerminalScreen from './src/screens/TerminalScreen';
@@ -14,12 +17,20 @@ const Stack = createNativeStackNavigator();
 
 function AppContent() {
   const [initialRoute, setInitialRoute] = useState(null);
+  const [accent, setAccent] = useState('#2563eb');
 
   useEffect(() => {
-    checkAuth();
+    boot();
   }, []);
 
-  const checkAuth = async () => {
+  const boot = async () => {
+    await loadBrand();
+    setAccent(getBrand().primaryColor || '#2563eb');
+    // Device must be paired to a practice before anything else.
+    if (!(await isActivated())) {
+      setInitialRoute('Activation');
+      return;
+    }
     const authed = await isAuthenticated();
     setInitialRoute(authed ? 'Setup' : 'Login');
   };
@@ -27,7 +38,7 @@ function AppContent() {
   if (!initialRoute) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={accent} />
       </View>
     );
   }
@@ -39,6 +50,7 @@ function AppContent() {
         initialRouteName={initialRoute}
         screenOptions={{ headerShown: false, animation: 'fade' }}
       >
+        <Stack.Screen name="Activation" component={ActivationScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Setup" component={SetupScreen} />
         <Stack.Screen name="Terminal" component={TerminalScreen} />

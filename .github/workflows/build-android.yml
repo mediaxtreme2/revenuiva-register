@@ -48,21 +48,20 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv android/app/build/outputs/apk/release/app-release.apk RevenuivaAI-v2.0.3.apk
+          mv android/app/build/outputs/apk/release/app-release.apk RevenuivaAI-v2.1.0.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.3-android
-          name: RevenuivaAI v2.0.3 (Android)
+          tag_name: v2.1.0-android
+          name: RevenuivaAI v2.1.0 (Android)
           body: |
-            RevenuivaAI v2.0.3
+            RevenuivaAI v2.1.0 — Multi-Tenant White-Glove
 
-            - Fixed crash on launch (removed Square native SDK that caused initialization failure)
-            - RevenuivaAI site-icon logo on app launcher and login screen
-            - App name: RevenuivaAI
+            - NEW: 6-digit Device Sync PIN activation on first launch
+            - NEW: Dynamic per-practice skin (logo, colors, name) via server config
+            - NEW: Practice-specific API endpoint resolved at activation
+            - Single master binary — no per-practice recompile
             - Stripe Tap to Pay NFC working
-            - Show/hide password toggle
-            - Persistent error screens
-          files: RevenuivaAI-v2.0.3.apk
+          files: RevenuivaAI-v2.1.0.apk
           make_latest: true

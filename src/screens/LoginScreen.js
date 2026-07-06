@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { COLORS, FONTS } from '../config/theme';
 import { login } from '../services/auth';
+import { getBrand } from '../services/brand';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -12,6 +13,9 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const brand = getBrand();
+  const accent = brand.primaryColor || COLORS.primary;
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -36,11 +40,11 @@ export default function LoginScreen({ navigation }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.container}>
         <View style={s.logoBox}>
           <Image
-            source={require('../../assets/logo.png')}
+            source={brand.logoUrl ? { uri: brand.logoUrl } : require('../../assets/logo.png')}
             style={s.logoImage}
             resizeMode="contain"
           />
-          <Text style={s.title}>RevenuivaAI</Text>
+          <Text style={[s.title, { color: accent }]}>{brand.practiceName || 'RevenuivaAI'}</Text>
           <Text style={s.subtitle}>Register Terminal</Text>
         </View>
 
@@ -82,7 +86,7 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={s.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.8}>
+          <TouchableOpacity style={[s.btn, { backgroundColor: accent, shadowColor: accent }]} onPress={handleLogin} disabled={loading} activeOpacity={0.8}>
             {loading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
